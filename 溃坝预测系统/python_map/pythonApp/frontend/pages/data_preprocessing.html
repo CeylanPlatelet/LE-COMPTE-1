@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>数据预处理 - 溃坝预测AI智能分析系统</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&amp;display=swap" rel="stylesheet"/>
+    <!-- 3D Earth dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            color: #ffffff;
+            font-family: 'Noto Sans SC', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 20px 40px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .nav-group {
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-group.left {
+            clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 100%, 20px 100%);
+        }
+
+        .nav-group.right {
+            clip-path: polygon(20px 0, 100% 0, calc(100% - 20px) 100%, 0 100%);
+        }
+
+        .nav-group::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .nav-group:hover::before {
+            left: 100%;
+        }
+
+        .nav-group:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .nav-group:active {
+            transform: translateY(0);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .nav-group::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .nav-group:hover::after {
+            opacity: 1;
+        }
+
+        .nav-link {
+            color: #00ffff;
+            text-decoration: none;
+            padding: 8px 15px;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            transition: all 0.3s;
+            position: relative;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        }
+
+        .nav-link.active {
+            background: rgba(0, 255, 255, 0.2);
+            border-color: #00ffff;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 100%;
+            background: rgba(0, 255, 255, 0.1);
+            transition: width 0.3s;
+            z-index: -1;
+        }
+
+        .nav-link:hover::before {
+            width: 100%;
+        }
+
+        .title {
+            font-size: 2.5em;
+            font-weight: 900;
+            text-align: center;
+            background: linear-gradient(45deg, #00ffff, #ff00ff, #ffff00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: brightness(1) drop-shadow(0 0 5px rgba(0, 255, 255, 0.5)); }
+            to { filter: brightness(1.2) drop-shadow(0 0 20px rgba(0, 255, 255, 0.8)); }
+        }
+        
+        /* 左侧导航组样式 */
+        .nav-section:first-child .nav-group {
+            clip-path: polygon(0% 0%, calc(100% - 15px) 0%, 100% 100%, 15px 100%);
+            border-right: 2px solid #00ffff;
+        }
+        
+        /* 右侧导航组样式 */
+        .nav-section:last-child .nav-group {
+            clip-path: polygon(15px 0%, 100% 0%, 100% 100%, 0% 100%);
+            border-left: 2px solid #00ffff;
+        }
+        
+        .nav-group::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 255, 255, 0.3));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        /* 左侧导航组伪元素样式 */
+        .nav-section:first-child .nav-group::before {
+            clip-path: polygon(0% 0%, calc(100% - 12px) 0%, 100% 100%, 12px 100%);
+        }
+        
+        /* 右侧导航组伪元素样式 */
+        .nav-section:last-child .nav-group::before {
+            clip-path: polygon(12px 0%, 100% 0%, 100% 100%, 0% 100%);
+        }
+        
+        .nav-group:hover {
+            background: rgba(0, 255, 255, 0.15);
+            border-color: #00ffff;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.6), 
+                        0 0 50px rgba(0, 255, 255, 0.3),
+                        inset 0 0 15px rgba(0, 255, 255, 0.2);
+            transform: translateY(-2px);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .nav-group:active {
+            transform: translateY(1px);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5), 
+                        inset 0 0 10px rgba(0, 255, 255, 0.3);
+            transition: all 0.1s ease;
+        }
+        
+        .nav-group:hover::before {
+            opacity: 1;
+        }
+        
+        .nav-group a {
+            color: #00ffff;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin: 0 6px;
+            padding: 4px 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            text-shadow: 0 0 4px rgba(0, 255, 255, 0.4);
+            font-family: 'Microsoft YaHei', sans-serif;
+            border-bottom: 1px solid transparent;
+        }
+        
+        .nav-group a:hover {
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4);
+            transform: scale(1.05);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.6);
+            animation: glitch 0.3s ease;
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        
+        .nav-group a.active {
+            color: #ffffff;
+            text-shadow: 0 0 12px rgba(0, 255, 255, 0.9), 0 0 24px rgba(0, 255, 255, 0.5);
+            background: rgba(0, 255, 255, 0.15);
+            border-radius: 2px;
+        }
+        
+        .nav-group a::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+        
+        .nav-group a:hover::before {
+            transform: translateX(100%);
+        }
+        
+        .nav-divider {
+            width: 1px;
+            height: 18px;
+            background: linear-gradient(to bottom, transparent, #00ffff, transparent);
+            margin: 0 8px;
+            box-shadow: 0 0 6px rgba(0, 255, 255, 0.4);
+        }
+        
+        /* 图标工具栏样式 */
+        .icon-toolbar {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0, 20, 40, 0.9);
+            border: 1px solid rgba(0, 191, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            gap: 10px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .icon-toolbar:hover {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* 创建触发区域 */
+        .icon-toolbar::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            right: -20px;
+            bottom: -10px;
+            left: -50px;
+            background: transparent;
+        }
+
+        .icon-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .icon-group .material-icons {
+            color: #00bfff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        
+        .icon-group .material-icons:hover {
+             color: #ffffff;
+             background: rgba(0, 191, 255, 0.2);
+             text-shadow: 0 0 10px rgba(0, 191, 255, 0.8);
+             transform: scale(1.1);
+         }
+          
+         /* 科技感动画效果 */
+         @keyframes pulse {
+             0% { box-shadow: 0 0 0 0 rgba(0, 191, 255, 0.4); }
+             70% { box-shadow: 0 0 0 10px rgba(0, 191, 255, 0); }
+             100% { box-shadow: 0 0 0 0 rgba(0, 191, 255, 0); }
+         }
+         
+         @keyframes glow {
+             0%, 100% { text-shadow: 0 0 15px rgba(0, 191, 255, 0.8); }
+             50% { text-shadow: 0 0 25px rgba(0, 191, 255, 1), 0 0 35px rgba(0, 191, 255, 0.8); }
+         }
+         
+         @keyframes slideIn {
+             from { transform: translateX(-100%); opacity: 0; }
+             to { transform: translateX(0); opacity: 1; }
+         }
+         
+         .title {
+             animation: glow 3s ease-in-out infinite;
+         }
+         
+         .nav-group {
+             animation: slideIn 0.8s ease-out;
+         }
+         
+         .nav-group:nth-child(1) { animation-delay: 0.1s; }
+         .nav-group:nth-child(2) { animation-delay: 0.2s; }
+         .nav-group:nth-child(3) { animation-delay: 0.3s; }
+         
+         .icon-group .material-icons {
+             animation: pulse 2s infinite;
+         }
+         
+         .icon-group .material-icons:nth-child(1) { animation-delay: 0s; }
+         .icon-group .material-icons:nth-child(2) { animation-delay: 0.5s; }
+         .icon-group .material-icons:nth-child(3) { animation-delay: 1s; }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 1rem;
+            padding: 1rem;
+            height: calc(100vh - 100px);
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        .panel {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 1rem rgba(0, 255, 255, 0.3);
+            min-height: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            box-sizing: border-box;
+            position: relative;
+        }
+        
+        .panel-title {
+            color: #87ceeb;
+            font-size: 1.25rem;
+            font-weight: 500;
+            border-bottom: 1px solid #1a3a6e;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            letter-spacing: 0.5px;
+        }
+        
+        .panel-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            background-color: #87ceeb;
+            margin-right: 8px;
+        }
+        
+        .tab-btn {
+            background-color: rgba(30, 64, 175, 0.5);
+            color: #93c5fd;
+            border: 1px solid #1e40af;
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border-radius: 6px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .tab-btn:hover {
+            background-color: rgba(0, 255, 255, 0.2);
+            color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        .tab-btn.active {
+            background-color: #1e40af;
+            color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+        
+        .stat-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            position: relative;
+        }
+        
+        .stat-circle::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .stat-circle-green {
+            border: 4px solid #4ade80;
+            color: #4ade80;
+            box-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
+            background: linear-gradient(145deg, rgba(0, 128, 0, 0.2), rgba(0, 128, 0, 0.4));
+        }
+        
+        .stat-circle-green::before {
+            border-top-color: #4ade80;
+            border-right-color: #4ade80;
+        }
+        
+        .stat-circle-blue {
+            border: 4px solid #60a5fa;
+            color: #60a5fa;
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.5);
+            background: linear-gradient(145deg, rgba(0, 0, 255, 0.2), rgba(0, 0, 255, 0.4));
+        }
+        
+        .stat-circle-blue::before {
+            border-top-color: #60a5fa;
+            border-right-color: #60a5fa;
+        }
+        
+        .stat-circle-yellow {
+            border: 4px solid #facc15;
+            color: #facc15;
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.5);
+            background: linear-gradient(145deg, rgba(255, 255, 0, 0.2), rgba(255, 255, 0, 0.4));
+        }
+        
+        .stat-circle-yellow::before {
+            border-top-color: #facc15;
+            border-right-color: #facc15;
+        }
+        
+        .stat-circle .value {
+            font-size: 1.5rem;
+        }
+        
+        .stat-circle .unit {
+            font-size: 0.75rem;
+        }
+        
+        .stat-label {
+            background-color: rgba(0, 191, 255, 0.2);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.875rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 0.4; }
+            100% { opacity: 0.8; }
+        }
+        
+        /* 响应式布局 */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+        }
+        
+        /* 底部导航样式 */
+        body {
+            padding-bottom: 80px;
+        }
+        
+        .main-container {
+            margin-bottom: 80px;
+        }
+        
+        /* 底部导航按钮激活状态 */
+        .nav-active {
+            color: #00bfff !important;
+            background-color: rgba(0, 191, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <!-- Header -->
+        <header>
+        <div class="nav-container">
+            <nav class="nav-group left">
+                <a href="../web_ui.html" class="nav-link">系统首页</a>
+                <a href="geography.html" class="nav-link">大坝信息</a>
+                <a href="#" class="nav-link">溃坝风险</a>
+                <a href="#" class="nav-link">监测预警</a>
+            </nav>
+            
+            <h1 class="title">溃坝预测AI智能分析系统</h1>
+            
+            <nav class="nav-group right">
+                <a href="data_preprocessing.html" class="nav-link active">数据预处理</a>
+                <a href="model_training.html" class="nav-link">模型训练</a>
+                <a href="result_analysis.html" class="nav-link">结果分析</a>
+                <a href="computing_power.html" class="nav-link">算力说明</a>
+            </nav>
+        </div>
+    </header>
+
+        <!-- 图标工具栏 -->
+        <div class="icon-toolbar">
+            <div class="icon-group">
+                <div class="icon-btn" id="fullscreen-btn" title="全屏">⛶</div>
+                <div class="icon-btn" onclick="openSettings()" title="设置">⚙</div>
+                <div class="icon-btn" onclick="showHelp()" title="帮助">?</div>
+                <div class="icon-btn" onclick="showNotifications()" title="通知">🔔</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main>
+        <div class="main-container">
+            <!-- 左侧面板 -->
+            <div class="panel">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="panel-title" style="border-bottom: none; margin-bottom: 0;">数据导入</h2>
+                </div>
+                <div class="flex justify-around items-center mb-6">
+                    <div class="text-center space-y-2">
+                        <div class="stat-circle stat-circle-green">
+                            <span class="value">156</span>
+                            <span class="unit">个</span>
+                        </div>
+                        <p class="text-xs text-gray-300">数据文件</p>
+                    </div>
+                    <div class="text-center space-y-2">
+                        <div class="stat-circle stat-circle-blue">
+                            <span class="value">2.3</span>
+                            <span class="unit">GB</span>
+                        </div>
+                        <p class="text-xs text-gray-300">数据大小</p>
+                    </div>
+                    <div class="text-center space-y-2">
+                        <div class="stat-circle stat-circle-yellow">
+                            <span class="value">98</span>
+                            <span class="unit">%</span>
+                        </div>
+                        <p class="text-xs text-gray-300">完整性</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4 mt-4">
+                    <div class="stat-label text-green-400">
+                        <p class="text-lg font-bold">45</p>
+                        <p class="text-xs">大坝结构数据</p>
+                    </div>
+                    <div class="stat-label text-blue-400">
+                        <p class="text-lg font-bold">67</p>
+                        <p class="text-xs">水位监测数据</p>
+                    </div>
+                    <div class="stat-label text-yellow-400">
+                        <p class="text-lg font-bold">44</p>
+                        <p class="text-xs">溃坝历史数据</p>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h3 class="panel-title">文件上传</h3>
+                    <div class="space-y-3 mb-4">
+                        <div class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center">
+                            <span class="material-symbols-outlined text-4xl text-gray-400 mb-2">cloud_upload</span>
+                            <p class="text-gray-300">拖拽文件到此处或点击上传</p>
+                            <input type="file" multiple class="hidden" id="file-upload">
+                            <button onclick="document.getElementById('file-upload').click()" 
+                                    class="tab-btn mt-2">选择文件</button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2 mt-4">
+                        <button class="tab-btn active flex items-center space-x-2">
+                            <span class="material-symbols-outlined text-base">upload</span>
+                            <span>上传</span>
+                        </button>
+                        <button class="tab-btn flex items-center space-x-2">
+                            <span class="material-symbols-outlined text-base">refresh</span>
+                            <span>刷新</span>
+                        </button>
+                        <button class="tab-btn flex items-center space-x-2">
+                            <span class="material-symbols-outlined text-base">delete</span>
+                            <span>清空</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h3 class="panel-title">文件列表</h3>
+                    <div class="border border-gray-700 rounded-lg p-4 h-64 bg-slate-900 bg-opacity-50 overflow-y-auto">
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center p-2 bg-slate-800 rounded">
+                                <span class="text-sm">大坝结构数据_2024.csv</span>
+                                <span class="text-xs text-green-400">已处理</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 bg-slate-800 rounded">
+                                <span class="text-sm">水位监测数据_历史.xlsx</span>
+                                <span class="text-xs text-yellow-400">处理中</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 bg-slate-800 rounded">
+                                <span class="text-sm">溃坝风险评估.json</span>
+                                <span class="text-xs text-blue-400">待处理</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 中间面板 -->
+            <div class="panel">
+                <div class="mt-6">
+                    <h3 class="panel-title">数据预处理流程</h3>
+                    <div class="relative w-full h-[600px] bg-black rounded-lg overflow-hidden p-4">
+                        <!-- 流程图 -->
+                        <div class="flex flex-col space-y-8 h-full justify-center">
+                            <div class="flex justify-between items-center">
+                                <div class="bg-blue-600 p-4 rounded-lg text-center w-32">
+                                    <span class="material-symbols-outlined text-2xl">input</span>
+                                    <p class="text-sm mt-2">大坝数据导入</p>
+                                </div>
+                                <div class="flex-1 h-1 bg-gradient-to-r from-blue-600 to-green-600 mx-4"></div>
+                                <div class="bg-green-600 p-4 rounded-lg text-center w-32">
+                                    <span class="material-symbols-outlined text-2xl">cleaning_services</span>
+                                    <p class="text-sm mt-2">水位数据清洗</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <div class="bg-yellow-600 p-4 rounded-lg text-center w-32">
+                                    <span class="material-symbols-outlined text-2xl">transform</span>
+                                    <p class="text-sm mt-2">风险数据转换</p>
+                                </div>
+                                <div class="flex-1 h-1 bg-gradient-to-r from-yellow-600 to-purple-600 mx-4"></div>
+                                <div class="bg-purple-600 p-4 rounded-lg text-center w-32">
+                                    <span class="material-symbols-outlined text-2xl">tune</span>
+                                    <p class="text-sm mt-2">溃坝特征工程</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <div class="bg-red-600 p-4 rounded-lg text-center w-32">
+                                    <span class="material-symbols-outlined text-2xl">verified</span>
+                                    <p class="text-sm mt-2">安全性验证</p>
+                                </div>
+                                <div class="flex-1 h-1 bg-gradient-to-r from-red-600 to-cyan-600 mx-4"></div>
+                                <div class="bg-cyan-600 p-4 rounded-lg text-center w-32">
+                                    <span class="material-symbols-outlined text-2xl">save</span>
+                                    <p class="text-sm mt-2">预测数据输出</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 进度指示器 -->
+                        <div class="absolute bottom-4 left-4 right-4">
+                            <div class="bg-slate-800 p-3 rounded-lg">
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span>处理进度</span>
+                                    <span>75%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full" style="width: 75%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧面板 -->
+            <div class="panel">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="panel-title" style="border-bottom: none; margin-bottom: 0;">处理配置</h3>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 text-sm font-bold mb-3">数据清洗设置</h4>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2">
+                                <span class="text-sm">移除重复数据</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2">
+                                <span class="text-sm">处理缺失值</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" class="mr-2">
+                                <span class="text-sm">异常值检测</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 text-sm font-bold mb-3">特征工程</h4>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2">
+                                <span class="text-sm">数据标准化</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" class="mr-2">
+                                <span class="text-sm">特征选择</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2">
+                                <span class="text-sm">维度降维</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 text-sm font-bold mb-3">输出格式</h4>
+                        <select class="w-full bg-slate-700 border border-gray-600 rounded p-2 text-white">
+                            <option>CSV格式</option>
+                            <option>JSON格式</option>
+                            <option>Parquet格式</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <div class="flex space-x-2">
+                        <button class="tab-btn active flex-1">
+                            <span class="material-symbols-outlined text-base mr-1">play_arrow</span>
+                            开始处理
+                        </button>
+                        <button class="tab-btn">
+                            <span class="material-symbols-outlined text-base">pause</span>
+                        </button>
+                        <button class="tab-btn">
+                            <span class="material-symbols-outlined text-base">stop</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h3 class="panel-title">处理日志</h3>
+                    <div class="bg-black rounded-lg p-3 h-48 overflow-y-auto text-xs font-mono">
+                        <div class="text-green-400">[2024-01-20 10:30:15] 开始数据预处理...</div>
+                        <div class="text-blue-400">[2024-01-20 10:30:16] 加载数据文件: 地质数据_2024.csv</div>
+                        <div class="text-yellow-400">[2024-01-20 10:30:18] 检测到 5 个缺失值</div>
+                        <div class="text-green-400">[2024-01-20 10:30:20] 数据清洗完成</div>
+                        <div class="text-blue-400">[2024-01-20 10:30:22] 开始特征工程...</div>
+                        <div class="text-green-400">[2024-01-20 10:30:25] 特征标准化完成</div>
+                        <div class="text-cyan-400">[2024-01-20 10:30:27] 处理进度: 75%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </main>
+
+    <script>
+        // 图标工具栏显示逻辑
+        const iconToolbar = document.querySelector('.icon-toolbar');
+        let showTimeout;
+        let hideTimeout;
+
+        // 鼠标进入右上角区域时显示工具栏
+        document.addEventListener('mousemove', (e) => {
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // 检查鼠标是否在右上角区域
+            if (e.clientX > windowWidth - 100 && e.clientY < 100) {
+                clearTimeout(hideTimeout);
+                showTimeout = setTimeout(() => {
+                    iconToolbar.classList.add('show');
+                }, 300);
+            } else {
+                clearTimeout(showTimeout);
+                hideTimeout = setTimeout(() => {
+                    iconToolbar.classList.remove('show');
+                }, 500);
+            }
+        });
+
+        // 全屏功能
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // 文件上传处理
+        document.getElementById('file-upload').addEventListener('change', function(e) {
+            const files = e.target.files;
+            console.log('选择的文件:', files);
+            // 这里可以添加文件上传逻辑
+        });
+
+        // 处理按钮事件
+        function startProcessing() {
+            console.log('开始数据处理');
+            // 这里可以添加数据处理逻辑
+        }
+
+        function pauseProcessing() {
+            console.log('暂停数据处理');
+        }
+
+        function stopProcessing() {
+            console.log('停止数据处理');
+        }
+    </script>
+</body>
+</html>

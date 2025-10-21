@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>算力说明 - 溃坝预测AI智能分析系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #00ffff;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            animation: scan 3s linear infinite;
+            z-index: 1000;
+        }
+
+        @keyframes scan {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(100vh); opacity: 0; }
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .nav-group {
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-group.left {
+            clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 100%, 20px 100%);
+        }
+
+        .nav-group.right {
+            clip-path: polygon(20px 0, 100% 0, calc(100% - 20px) 100%, 0 100%);
+        }
+
+        .nav-group::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .nav-group:hover::before {
+            left: 100%;
+        }
+
+        .nav-group:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .nav-group:active {
+            transform: translateY(0);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .nav-group::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .nav-group:hover::after {
+            opacity: 1;
+        }
+
+        .nav-link {
+            color: #00ffff;
+            text-decoration: none;
+            padding: 8px 15px;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            transition: all 0.3s;
+            position: relative;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        }
+
+        .nav-link.active {
+            background: rgba(0, 255, 255, 0.2);
+            border-color: #00ffff;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 100%;
+            background: rgba(0, 255, 255, 0.1);
+            transition: width 0.3s;
+            z-index: -1;
+        }
+
+        .nav-link:hover::before {
+            width: 100%;
+        }
+
+        .title {
+            font-size: 2.5em;
+            font-weight: 900;
+            text-align: center;
+            background: linear-gradient(45deg, #00ffff, #ff00ff, #ffff00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: brightness(1) drop-shadow(0 0 5px rgba(0, 255, 255, 0.5)); }
+            to { filter: brightness(1.2) drop-shadow(0 0 20px rgba(0, 255, 255, 0.8)); }
+        }
+
+        .divider {
+            width: 2px;
+            height: 30px;
+            background: linear-gradient(to bottom, transparent, #00ffff, transparent);
+            margin: 0 20px;
+        }
+
+        .icon-toolbar {
+            position: fixed;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .icon-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #00ffff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 20px;
+        }
+
+        .icon-btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+            transform: scale(1.1);
+        }
+
+        main {
+            margin-top: 120px;
+            padding: 20px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .panel {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.1), transparent);
+            transition: left 0.8s;
+        }
+
+        .panel:hover::before {
+            left: 100%;
+        }
+
+        .panel-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #00ffff;
+            border-bottom: 2px solid rgba(0, 255, 255, 0.3);
+            padding-bottom: 10px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 5px;
+            color: #00ffff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .tab-btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .tab-btn.active {
+            background: rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+
+        .stats-circle {
+            width: 120px;
+            height: 120px;
+            border: 3px solid;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 10px;
+            position: relative;
+        }
+
+        .stats-circle.cpu { border-color: #ff6b6b; }
+        .stats-circle.gpu { border-color: #4ecdc4; }
+        .stats-circle.memory { border-color: #45b7d1; }
+        .stats-circle.storage { border-color: #96ceb4; }
+
+        .stats-number {
+            font-size: 1.8em;
+            font-weight: 700;
+            animation: counter 2s ease-out;
+        }
+
+        .stats-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        @keyframes counter {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .computing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .spec-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+
+        .spec-item:hover {
+            background: rgba(0, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .spec-label {
+            font-weight: 600;
+            color: #00ffff;
+        }
+
+        .spec-value {
+            color: #ffffff;
+            font-weight: 400;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            border-radius: 4px;
+            transition: width 1s ease;
+        }
+
+        .performance-chart {
+            height: 200px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .nav-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .title {
+                font-size: 1.8em;
+            }
+            
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .computing-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .fullscreen-mode {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(20px);
+        }
+
+        .fullscreen-mode main {
+            margin-top: 0;
+            padding: 40px;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 30px;
+            border-radius: 25px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .bottom-nav .nav-link.active {
+            background: rgba(0, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="scanline"></div>
+    
+    <header>
+        <div class="nav-container">
+            <nav class="nav-group left">
+                <a href="../web_ui.html" class="nav-link">系统首页</a>
+                <a href="#" class="nav-link">大坝信息</a>
+                <a href="#" class="nav-link">溃坝风险</a>
+                <a href="#" class="nav-link">监测预警</a>
+            </nav>
+            
+            <h1 class="title">算力说明</h1>
+            
+            <nav class="nav-group right">
+                <a href="data_preprocessing.html" class="nav-link">数据预处理</a>
+                <a href="model_training.html" class="nav-link">模型训练</a>
+                <a href="result_analysis.html" class="nav-link">结果分析</a>
+                <a href="computing_power.html" class="nav-link active">算力说明</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="icon-toolbar">
+        <div class="icon-btn" onclick="toggleFullscreen()" title="全屏模式">⛶</div>
+        <div class="icon-btn" onclick="toggleSettings()" title="系统设置">⚙</div>
+        <div class="icon-btn" onclick="showHelp()" title="帮助信息">?</div>
+        <div class="icon-btn" onclick="refreshData()" title="刷新数据">↻</div>
+    </div>
+
+    <main>
+        <div class="grid-container">
+            <!-- 系统配置面板 -->
+            <div class="panel">
+                <h2 class="panel-title">溃坝预测计算系统配置</h2>
+                <div class="spec-item">
+                    <span class="spec-label">处理器</span>
+                    <span class="spec-value">Intel Xeon E5-2690 v4 @ 2.60GHz</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">核心数</span>
+                    <span class="spec-value">14 核心 / 28 线程</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">显卡</span>
+                    <span class="spec-value">NVIDIA Tesla V100 32GB</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">内存</span>
+                    <span class="spec-value">128GB DDR4 ECC</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">存储</span>
+                    <span class="spec-value">2TB NVMe SSD + 8TB HDD</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">网络</span>
+                    <span class="spec-value">10Gbps 以太网</span>
+                </div>
+            </div>
+
+            <!-- 实时监控面板 -->
+            <div class="panel">
+                <h2 class="panel-title">溃坝计算资源实时监控</h2>
+                <div style="display: flex; justify-content: space-around; flex-wrap: wrap;">
+                    <div class="stats-circle cpu">
+                        <div class="stats-number">45%</div>
+                        <div class="stats-label">CPU</div>
+                    </div>
+                    <div class="stats-circle gpu">
+                        <div class="stats-number">78%</div>
+                        <div class="stats-label">GPU</div>
+                    </div>
+                    <div class="stats-circle memory">
+                        <div class="stats-number">62%</div>
+                        <div class="stats-label">内存</div>
+                    </div>
+                    <div class="stats-circle storage">
+                        <div class="stats-number">34%</div>
+                        <div class="stats-label">存储</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="computing-grid">
+            <!-- 计算能力面板 -->
+            <div class="panel">
+                <h2 class="panel-title">计算能力</h2>
+                <div class="spec-item">
+                    <span class="spec-label">浮点运算能力</span>
+                    <span class="spec-value">15.7 TFLOPS (FP32)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">深度学习性能</span>
+                    <span class="spec-value">125 TFLOPS (Tensor)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">内存带宽</span>
+                    <span class="spec-value">900 GB/s</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">并行处理能力</span>
+                    <span class="spec-value">5120 CUDA 核心</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 85%;"></div>
+                </div>
+            </div>
+
+            <!-- 性能基准面板 -->
+            <div class="panel">
+                <h2 class="panel-title">性能基准</h2>
+                <div class="spec-item">
+                    <span class="spec-label">图像处理速度</span>
+                    <span class="spec-value">1200 张/秒</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">模型训练时间</span>
+                    <span class="spec-value">ResNet-50: 2.5 小时</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">推理延迟</span>
+                    <span class="spec-value">< 10ms</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">批处理能力</span>
+                    <span class="spec-value">512 样本/批次</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 92%;"></div>
+                </div>
+            </div>
+
+            <!-- 资源分配面板 -->
+            <div class="panel">
+                <h2 class="panel-title">溃坝计算资源分配</h2>
+                <div class="tab-buttons">
+                    <div class="tab-btn active" onclick="switchTab('allocation')">当前分配</div>
+                    <div class="tab-btn" onclick="switchTab('history')">历史记录</div>
+                    <div class="tab-btn" onclick="switchTab('optimization')">优化建议</div>
+                </div>
+                <div id="allocation-content">
+                    <div class="spec-item">
+                        <span class="spec-label">大坝数据预处理</span>
+                        <span class="spec-value">25% CPU + 15% GPU</span>
+                    </div>
+                    <div class="spec-item">
+                        <span class="spec-label">溃坝预测模型训练</span>
+                        <span class="spec-value">60% CPU + 80% GPU</span>
+                    </div>
+                    <div class="spec-item">
+                        <span class="spec-label">风险结果分析</span>
+                        <span class="spec-value">15% CPU + 5% GPU</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 性能图表面板 -->
+            <div class="panel">
+                <h2 class="panel-title">溃坝计算性能趋势</h2>
+                <div class="performance-chart">
+                    <p>性能监控图表区域<br>（实时更新中...）</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 全屏切换
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                document.body.classList.add('fullscreen-mode');
+            } else {
+                document.exitFullscreen();
+                document.body.classList.remove('fullscreen-mode');
+            }
+        }
+
+        // 设置面板
+        function toggleSettings() {
+            alert('系统设置功能开发中...');
+        }
+
+        // 帮助信息
+        function showHelp() {
+            alert('算力说明页面\n\n显示系统硬件配置、计算能力、性能基准和资源分配情况。\n\n支持实时监控和性能优化建议。');
+        }
+
+        // 刷新数据
+        function refreshData() {
+            // 模拟数据刷新
+            const circles = document.querySelectorAll('.stats-circle .stats-number');
+            circles.forEach(circle => {
+                const currentValue = parseInt(circle.textContent);
+                const newValue = Math.max(10, Math.min(95, currentValue + Math.floor(Math.random() * 21) - 10));
+                circle.textContent = newValue + '%';
+            });
+            
+            // 更新进度条
+            const progressBars = document.querySelectorAll('.progress-fill');
+            progressBars.forEach(bar => {
+                const newWidth = Math.max(20, Math.min(100, Math.floor(Math.random() * 80) + 20));
+                bar.style.width = newWidth + '%';
+            });
+        }
+
+        // 切换标签
+        function switchTab(tabName) {
+            // 移除所有活动状态
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // 添加活动状态到当前按钮
+            event.target.classList.add('active');
+            
+            // 更新内容
+            const content = document.getElementById('allocation-content');
+            switch(tabName) {
+                case 'allocation':
+                    content.innerHTML = `
+                        <div class="spec-item">
+                            <span class="spec-label">数据预处理</span>
+                            <span class="spec-value">25% CPU + 15% GPU</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">模型训练</span>
+                            <span class="spec-value">60% CPU + 80% GPU</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">结果分析</span>
+                            <span class="spec-value">15% CPU + 5% GPU</span>
+                        </div>
+                    `;
+                    break;
+                case 'history':
+                    content.innerHTML = `
+                        <div class="spec-item">
+                            <span class="spec-label">昨日平均使用率</span>
+                            <span class="spec-value">CPU: 68% | GPU: 72%</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">本周峰值</span>
+                            <span class="spec-value">CPU: 95% | GPU: 98%</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">任务完成数</span>
+                            <span class="spec-value">1,247 个任务</span>
+                        </div>
+                    `;
+                    break;
+                case 'optimization':
+                    content.innerHTML = `
+                        <div class="spec-item">
+                            <span class="spec-label">建议</span>
+                            <span class="spec-value">增加GPU内存以提升训练效率</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">优化</span>
+                            <span class="spec-value">启用混合精度训练可提升30%性能</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">调度</span>
+                            <span class="spec-value">夜间时段可安排大型训练任务</span>
+                        </div>
+                    `;
+                    break;
+            }
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 模拟实时数据更新
+            setInterval(refreshData, 30000); // 每30秒更新一次
+            
+            // 添加页面动画效果
+            const panels = document.querySelectorAll('.panel');
+            panels.forEach((panel, index) => {
+                panel.style.opacity = '0';
+                panel.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    panel.style.transition = 'all 0.6s ease';
+                    panel.style.opacity = '1';
+                    panel.style.transform = 'translateY(0)';
+                }, index * 200);
+            });
+        });
+
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F11') {
+                e.preventDefault();
+                toggleFullscreen();
+            } else if (e.key === 'F5') {
+                e.preventDefault();
+                refreshData();
+            }
+        });
+    </script>
+</body>
+</html>

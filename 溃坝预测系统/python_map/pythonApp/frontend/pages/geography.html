@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地理与地质 - 溃坝过程预测系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+            border-bottom: 2px solid rgba(0, 191, 255, 0.5);
+        }
+        
+        .header-title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 10px rgba(0, 191, 255, 0.7);
+            letter-spacing: 2px;
+        }
+        
+        .panel {
+            background: linear-gradient(145deg, #1e293b 0%, #334155 100%);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .panel-title {
+            color: #00bfff;
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid rgba(0, 191, 255, 0.3);
+            padding-bottom: 0.5rem;
+        }
+        
+        .search-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .search-input {
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            width: 200px;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #00bfff;
+            box-shadow: 0 0 10px rgba(0, 191, 255, 0.3);
+        }
+        
+        .search-btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            margin-left: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .search-btn:hover {
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .location-info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(0, 191, 255, 0.5);
+            border-radius: 12px;
+            padding: 16px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-width: 250px;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen">
+    <!-- Header -->
+    <header class="header p-4">
+        <nav class="flex justify-between items-center">
+            <h1 class="header-title">地理与地质信息系统</h1>
+            <a href="../web_ui.html" class="text-blue-300 hover:text-white transition-colors duration-300 flex items-center space-x-2">
+                <span class="material-icons">arrow_back</span>
+                <span>返回主页</span>
+            </a>
+        </nav>
+    </header>
+
+    <main class="container mx-auto p-6">
+        <!-- 3D地球容器 -->
+        <div class="panel mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="panel-title" style="border-bottom: none; margin-bottom: 0;">3D地球 - 地理位置标记</h2>
+                <div class="flex items-center space-x-2">
+                    <span class="material-icons text-cyan-400">public</span>
+                    <span class="text-gray-300 text-sm">交互式地球仪</span>
+                </div>
+            </div>
+            
+            <div id="globe-container" class="relative w-full h-[600px] bg-black rounded-lg overflow-hidden">
+                <canvas id="earth-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+                
+                <!-- 搜索控件 -->
+                <div id="search-controls" class="search-container">
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="search-input" class="search-input" placeholder="搜索地点..." />
+                        <button onclick="searchLocation()" class="search-btn">
+                            <span class="material-icons text-sm">search</span>
+                        </button>
+                        <button onclick="showAllMarkers()" class="search-btn">
+                            <span class="material-icons text-sm">place</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 位置信息显示 -->
+                <div id="location-info" class="hidden location-info-panel">
+                    <h3 class="text-cyan-400 font-bold mb-3 flex items-center">
+                        <span class="material-icons mr-2">location_on</span>
+                        位置信息
+                    </h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">经度:</span>
+                            <span id="longitude-display" class="text-white font-semibold">--</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">纬度:</span>
+                            <span id="latitude-display" class="text-white font-semibold">--</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">地点:</span>
+                            <span id="location-name" class="text-white font-semibold">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 案例详情面板 -->
+        <div class="panel">
+            <h2 class="panel-title">案例详细信息</h2>
+            <div id="caseInfo" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <!-- 案例详细信息将通过JavaScript动态填充 -->
+                <div class="bg-slate-800 p-4 rounded-lg border border-blue-900">
+                    <h4 class="text-cyan-400 text-sm font-bold mb-2">请选择案例</h4>
+                    <p class="text-sm text-gray-400">从首页案例列表中选择案例查看详细信息</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 全局变量
+        let scene, camera, renderer, earth, controls;
+        let markers = [];
+        let currentMarkerCount = 0;
+        
+        // 地点数据
+        const locations = [
+            { name: "丹巴梅龙沟", lat: 30.9810, lon: 102.0250, type: "泥石流" },
+            { name: "泸定县烂田湾", lat: 29.5909, lon: 102.1797, type: "滑坡" },
+            { name: "唐家山堰塞坝", lat: 31.8467, lon: 104.4272, type: "堰塞湖" },
+            { name: "一把刀", lat: 31.6061, lon: 104.3556, type: "地质灾害点" },
+            { name: "大光包", lat: 31.6349, lon: 104.1022, type: "地质灾害点" },
+            { name: "野牛沟", lat: 30.4889, lon: 102.2689, type: "泥石流" }
+        ];
+
+        // 初始化3D地球
+        async function initEarth() {
+            const container = document.getElementById('globe-container');
+            if (!container) {
+                console.error('Globe container not found');
+                return;
+            }
+
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            // 创建相机
+            const aspect = container.clientWidth / container.clientHeight;
+            camera = new THREE.PerspectiveCamera(30, aspect, 0.01, 1000);
+            camera.position.z = 8;
+            camera.position.y = 0;
+            camera.lookAt(0, 0, 0);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({
+                canvas: document.getElementById('earth-canvas'),
+                antialias: true,
+                alpha: true,
+                powerPreference: "high-performance"
+            });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // 添加轨道控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enableZoom = true;
+            controls.enablePan = true;
+            controls.minDistance = 1.5;
+            controls.maxDistance = 20;
+            controls.autoRotate = false;
+
+            // 创建地球
+            const geometry = new THREE.SphereGeometry(2, 128, 128);
+            const earthMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x4a90e2,
+                shininess: 60,
+                specular: 0x111111,
+                transparent: false,
+                side: THREE.FrontSide
+            });
+
+            earth = new THREE.Mesh(geometry, earthMaterial);
+            earth.rotation.y = Math.PI;
+            scene.add(earth);
+
+            // 尝试加载地球纹理
+            const textureLoader = new THREE.TextureLoader();
+            const textureUrls = [
+                'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+                'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg'
+            ];
+
+            let textureLoaded = false;
+            for (const url of textureUrls) {
+                try {
+                    const texture = await new Promise((resolve, reject) => {
+                        textureLoader.load(url, resolve, undefined, reject);
+                    });
+                    texture.wrapS = THREE.RepeatWrapping;
+                    texture.wrapT = THREE.RepeatWrapping;
+                    earth.material.map = texture;
+                    earth.material.needsUpdate = true;
+                    textureLoaded = true;
+                    console.log('Earth texture loaded successfully');
+                    break;
+                } catch (error) {
+                    console.warn('Failed to load texture:', url);
+                }
+            }
+
+            if (!textureLoaded) {
+                console.log('Using default earth material');
+            }
+
+            // 添加光照
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight.position.set(5, 3, 5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
+            fillLight.position.set(-3, 2, -3);
+            scene.add(fillLight);
+
+            // 添加点击事件
+            renderer.domElement.addEventListener('click', onCanvasClick);
+
+            // 开始渲染循环
+            animate();
+
+            // 显示所有标记点
+            showAllMarkers();
+
+            console.log('Earth initialized successfully');
+        }
+
+        // 渲染循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 地球缓慢自转
+            if (earth) {
+                earth.rotation.y += 0.002; // 控制自转速度
+            }
+            
+            if (controls) {
+                controls.update();
+            }
+            
+            // 标记点发光效果
+            markers.forEach(marker => {
+                if (marker.userData.glowMaterial) {
+                    marker.userData.glowMaterial.opacity = 0.3 + 0.3 * Math.sin(Date.now() * 0.005);
+                }
+            });
+            
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        // 添加标记点
+        function addMarker(lat, lon, color = 0xff0000, name = '') {
+            if (!earth) return;
+
+            // 将经纬度转换为3D坐标
+            const phi = (90 - lat) * (Math.PI / 180);
+            const theta = (lon + 180) * (Math.PI / 180);
+            const radius = 2.02;
+
+            const x = -(radius * Math.sin(phi) * Math.cos(theta));
+            const z = (radius * Math.sin(phi) * Math.sin(theta));
+            const y = (radius * Math.cos(phi));
+
+            // 创建标记点
+            const markerGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+            const markerMaterial = new THREE.MeshBasicMaterial({ color: color });
+            const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+            
+            marker.position.set(x, y, z);
+            marker.userData = { lat, lon, name, color };
+
+            // 创建发光效果
+            const glowGeometry = new THREE.SphereGeometry(0.04, 16, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.3
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            glow.position.copy(marker.position);
+            marker.userData.glowMaterial = glowMaterial;
+
+            scene.add(marker);
+            scene.add(glow);
+            markers.push(marker);
+            markers.push(glow);
+
+            currentMarkerCount++;
+            updateMarkerCount();
+
+            console.log(`Added marker: ${name} at (${lat}, ${lon})`);
+        }
+
+        // 显示所有标记点
+        function showAllMarkers() {
+            // 清除现有标记
+            markers.forEach(marker => {
+                scene.remove(marker);
+            });
+            markers = [];
+            currentMarkerCount = 0;
+
+            // 添加所有地点标记
+            locations.forEach(location => {
+                let color = 0xff0000; // 默认红色
+                switch (location.type) {
+                    case '泥石流': color = 0xff0000; break;
+                    case '滑坡': color = 0x00ff00; break;
+                    case '堰塞湖': color = 0xffff00; break;
+                    case '地质灾害点': color = 0xff6600; break;
+                }
+                addMarker(location.lat, location.lon, color, location.name);
+            });
+
+            console.log(`Loaded ${locations.length} markers`);
+        }
+
+        // 搜索地点
+        function searchLocation() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            if (!searchTerm) return;
+
+            const location = locations.find(loc => 
+                loc.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (location) {
+                zoomToLocation(location.lat, location.lon, location.name);
+                showLocationInfo(location.lat, location.lon, location.name);
+            } else {
+                alert('未找到该地点');
+            }
+        }
+
+        // 缩放到指定位置
+        function zoomToLocation(lat, lon, name = '') {
+            if (!camera || !controls) return;
+
+            const phi = (90 - lat) * (Math.PI / 180);
+            const theta = (lon + 180) * (Math.PI / 180);
+            const radius = 4;
+
+            const x = -(radius * Math.sin(phi) * Math.cos(theta));
+            const z = (radius * Math.sin(phi) * Math.sin(theta));
+            const y = (radius * Math.cos(phi));
+
+            // 平滑移动相机
+            const startPosition = camera.position.clone();
+            const endPosition = new THREE.Vector3(x, y, z);
+            const duration = 2000;
+            const startTime = Date.now();
+
+            function animateCamera() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+                camera.position.lerpVectors(startPosition, endPosition, easeProgress);
+                camera.lookAt(0, 0, 0);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateCamera);
+                }
+            }
+
+            animateCamera();
+            console.log(`Zooming to: ${name} (${lat}, ${lon})`);
+        }
+
+        // 显示位置信息
+        function showLocationInfo(lat, lon, name = '') {
+            const locationInfo = document.getElementById('location-info');
+            const longitudeDisplay = document.getElementById('longitude-display');
+            const latitudeDisplay = document.getElementById('latitude-display');
+            const locationName = document.getElementById('location-name');
+
+            longitudeDisplay.textContent = lon.toFixed(4);
+            latitudeDisplay.textContent = lat.toFixed(4);
+            locationName.textContent = name || '未知地点';
+
+            locationInfo.classList.remove('hidden');
+
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                locationInfo.classList.add('hidden');
+            }, 5000);
+        }
+
+        // 画布点击事件
+        function onCanvasClick(event) {
+            if (!camera || !renderer) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            // 检查是否点击了标记点
+            const markerIntersects = raycaster.intersectObjects(markers);
+            if (markerIntersects.length > 0) {
+                const marker = markerIntersects[0].object;
+                if (marker.userData.name) {
+                    showLocationInfo(marker.userData.lat, marker.userData.lon, marker.userData.name);
+                    return;
+                }
+            }
+
+            // 检查是否点击了地球
+            const earthIntersects = raycaster.intersectObject(earth);
+            if (earthIntersects.length > 0) {
+                const point = earthIntersects[0].point;
+                const lat = 90 - (Math.acos(point.y / 2) * 180 / Math.PI);
+                const lon = ((270 + (Math.atan2(point.x, point.z) * 180 / Math.PI)) % 360) - 180;
+                
+                showLocationInfo(lat, lon, '点击位置');
+            }
+        }
+
+        // 更新标记点数量显示
+        function updateMarkerCount() {
+            const markerCountElement = document.getElementById('marker-count');
+            if (markerCountElement) {
+                markerCountElement.textContent = currentMarkerCount;
+            }
+        }
+
+        // 窗口大小调整
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+
+            const container = document.getElementById('globe-container');
+            const aspect = container.clientWidth / container.clientHeight;
+            
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Geography page loaded, initializing Earth...');
+            initEarth();
+            
+            // 监听窗口大小变化
+            window.addEventListener('resize', onWindowResize);
+            
+            // 搜索框回车事件
+            document.getElementById('search-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchLocation();
+                }
+            });
+            
+            // 检查是否有从首页传递的案例数据
+            checkSelectedCase();
+        });
+        
+        // 检查localStorage中的选中案例数据
+        function checkSelectedCase() {
+            const selectedCaseData = localStorage.getItem('selectedCase');
+            if (selectedCaseData) {
+                try {
+                    const caseItem = JSON.parse(selectedCaseData);
+                    updateCaseInfo(caseItem);
+                    // 清除localStorage中的数据，避免重复显示
+                    localStorage.removeItem('selectedCase');
+                } catch (error) {
+                    console.error('Error parsing selected case data:', error);
+                }
+            }
+        }
+        
+        // 更新案例信息显示
+        function updateCaseInfo(caseItem) {
+            const caseInfoContainer = document.getElementById('caseInfo');
+            caseInfoContainer.innerHTML = '';
+
+            const infoGroups = [
+                [
+                    { label: '案例行', value: caseItem.id || 1 },
+                    { label: '坡度', value: caseItem.slope || 1 },
+                    { label: '坡面长', value: caseItem.slopeLength || 1 },
+                    { label: '城镇', value: caseItem.town || 11 }
+                ],
+                [
+                    { label: '发生日', value: caseItem.date || 1 },
+                    { label: '坡宽', value: caseItem.width || 1 },
+                    { label: '汇水长', value: caseItem.drainageLength || 11 },
+                    { label: '城镇点', value: caseItem.townPoint || 1 }
+                ],
+                [
+                    { label: '流域E', value: caseItem.basinE || 1 },
+                    { label: '坡长', value: caseItem.slopeLength2 || 1 },
+                    { label: '上游', value: caseItem.upstream || 11 },
+                    { label: '城镇人', value: caseItem.townPeople || 1 }
+                ],
+                [
+                    { label: '案例I', value: caseItem.caseI || 1 },
+                    { label: '植被I', value: caseItem.vegetationI || 1 },
+                    { label: '漫流', value: caseItem.overflow || 11 },
+                    { label: '经济', value: caseItem.economy || 11 }
+                ]
+            ];
+
+            infoGroups.forEach(group => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'bg-slate-800 p-4 rounded-lg border border-blue-900 flex flex-col space-y-2';
+                
+                group.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'flex justify-between items-center';
+                    itemDiv.innerHTML = `
+                        <span class="text-cyan-400 text-sm">${item.label}:</span>
+                        <span class="text-white font-bold">${item.value}</span>
+                    `;
+                    groupDiv.appendChild(itemDiv);
+                });
+                
+                caseInfoContainer.appendChild(groupDiv);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>溃坝过程预测系统</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&amp;display=swap" rel="stylesheet"/>
+    <!-- 3D Earth dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- 引入CSS文件 -->
+    <link href="css/common.css" rel="stylesheet"/>
+    <link href="css/index.css" rel="stylesheet"/>
+    
+    <style>
+        /* 基础样式 */
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #0a192f;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* 头部样式 */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: rgba(10, 25, 47, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 191, 255, 0.2);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 80px;
+        }
+        
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .nav-group {
+            display: flex;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(0, 191, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 16px;
+            margin: 0 8px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(0, 191, 255, 0.8);
+            letter-spacing: 1px;
+            text-align: center;
+            flex-grow: 1;
+        }
+        
+        .nav-link {
+            color: #93c5fd;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin: 0 10px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-link:hover {
+            color: #ffffff;
+            background: rgba(0, 191, 255, 0.1);
+        }
+        
+        /* 图标工具栏样式 */
+        .icon-toolbar {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0, 20, 40, 0.9);
+            border: 1px solid rgba(0, 191, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            gap: 10px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+        
+        .icon-toolbar:hover {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        /* 创建触发区域 */
+        .icon-toolbar::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            right: -20px;
+            bottom: -10px;
+            left: -50px;
+            background: transparent;
+        }
+        
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid rgba(0, 191, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #00bfff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+        
+        .icon-btn:hover {
+            background: rgba(0, 191, 255, 0.2);
+            border-color: #00bfff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 191, 255, 0.3);
+        }
+        
+        /* 主容器样式 */
+        .main-container {
+            padding-top: 100px;
+            padding-bottom: 80px;
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        
+        /* 面板样式 */
+        .panel {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-title {
+            color: #87ceeb;
+            font-size: 1.25rem;
+            font-weight: 500;
+            border-bottom: 1px solid #1a3a6e;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* 底部导航样式 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(10, 25, 47, 0.9);
+            border-top: 1px solid rgba(0, 191, 255, 0.2);
+            padding: 10px 0;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            z-index: 100;
+        }
+        
+        .bottom-nav a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #93c5fd;
+            transition: all 0.3s ease;
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+        
+        .bottom-nav a:hover {
+            color: #ffffff;
+            background: rgba(0, 191, 255, 0.1);
+        }
+        
+        .bottom-nav a.nav-active {
+            color: #00bfff;
+            background: rgba(0, 191, 255, 0.1);
+        }
+        
+        /* 隐藏类 */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <!-- Header -->
+        <header>
+            <div class="nav-container">
+                <nav class="nav-group left">
+                    <a href="javascript:location.reload()" class="nav-link active">系统首页</a>
+                    <a href="#" class="nav-link">大坝信息</a>
+                    <a href="#" class="nav-link">溃坝风险</a>
+                    <a href="#" class="nav-link">监测预警</a>
+                </nav>
+                
+                <h1 class="title">溃坝预测AI智能分析系统</h1>
+                
+                <nav class="nav-group right">
+                    <a href="pages/data_preprocessing.html" class="nav-link">数据预处理</a>
+                    <a href="pages/model_training.html" class="nav-link">模型训练</a>
+                    <a href="pages/result_analysis.html" class="nav-link">结果分析</a>
+                    <a href="pages/computing_power.html" class="nav-link">算力说明</a>
+                </nav>
+            </div>
+        </header>
+
+        <div class="icon-toolbar">
+            <div class="icon-btn" id="fullscreen-btn" title="全屏模式">⛶</div>
+            <div class="icon-btn" onclick="toggleSettings()" title="系统设置">⚙</div>
+            <div class="icon-btn" onclick="showHelp()" title="帮助信息">?</div>
+            <div class="icon-btn" onclick="refreshData()" title="刷新数据">↻</div>
+        </div>
+
+        <main>
+            <!-- 大坝监测页面 -->
+            <div id="page1" class="main-container page-content">
+                <!-- 左侧面板 -->
+                <div class="panel">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="panel-title" style="border-bottom: none; margin-bottom: 0;">大坝风险统计</h2>
+                        <div class="flex items-center space-x-2">
+                            <button class="text-gray-400 text-sm">长江流域</button>
+                            <span class="material-icons text-gray-400">chevron_right</span>
+                        </div>
+                    </div>
+                    <div class="overflow-y-auto overflow-x-hidden w-full flex-grow">
+                        <div class="grid grid-cols-1 gap-4">
+                            <!-- 风险统计卡片 -->
+                            <div class="bg-slate-800 p-4 rounded-lg border border-blue-900">
+                                <h3 class="text-cyan-400 text-lg font-bold mb-2">高风险大坝</h3>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-3xl font-bold text-red-500">12</span>
+                                    <span class="text-red-400 text-sm">+2 较上月</span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-slate-800 p-4 rounded-lg border border-blue-900">
+                                <h3 class="text-cyan-400 text-lg font-bold mb-2">中风险大坝</h3>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-3xl font-bold text-yellow-500">28</span>
+                                    <span class="text-green-400 text-sm">-3 较上月</span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-slate-800 p-4 rounded-lg border border-blue-900">
+                                <h3 class="text-cyan-400 text-lg font-bold mb-2">低风险大坝</h3>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-3xl font-bold text-green-500">45</span>
+                                    <span class="text-gray-400 text-sm">持平</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 中间面板 -->
+                <div class="panel">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="panel-title" style="border-bottom: none; margin-bottom: 0;">地理分布</h2>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" placeholder="搜索地点..." class="bg-slate-800 border border-blue-900 rounded-lg px-3 py-1 text-sm w-40" id="location-search" />
+                            <button class="bg-blue-600 text-white rounded-lg px-2 py-1 text-sm" onclick="searchLocation()">搜索</button>
+                        </div>
+                    </div>
+                    <div class="flex-grow relative">
+                        <div class="absolute inset-0 rounded-lg overflow-hidden">
+                            <div id="globe-container" class="w-full h-full bg-black relative">
+                                <canvas id="earth-canvas" class="w-full h-full"></canvas>
+                                
+                                <!-- 位置信息显示 -->
+                                <div id="location-info" class="hidden absolute top-4 right-4 bg-slate-800 p-4 rounded-lg border border-blue-900 z-10">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p class="text-sm text-gray-400">经度</p>
+                                            <p id="longitude-display" class="text-lg font-semibold">0.0000</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm text-gray-400">纬度</p>
+                                            <p id="latitude-display" class="text-lg font-semibold">0.0000</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧面板 -->
+                <div class="panel">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="panel-title" style="border-bottom: none; margin-bottom: 0;">大坝监测数据</h3>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-300">监测曲线</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input checked="" class="sr-only peer" type="checkbox" value="" id="chartToggle"/>
+                                <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="chart-container mb-4 h-[250px]">
+                        <canvas id="damChart"></canvas>
+                    </div>
+                    <div class="overflow-y-auto overflow-x-hidden w-full flex-grow">
+                        <h3 class="panel-title">监测数据概览</h3>
+                        <div class="grid grid-cols-1 gap-4">
+                            <!-- 监测数据概览 -->
+                            <div class="bg-slate-800 p-3 rounded-lg border border-blue-900">
+                                <h4 class="text-cyan-400 text-sm font-bold mb-2">系统状态</h4>
+                                <p class="text-sm text-gray-400">大坝监测系统运行正常</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模型预测页面 -->
+            <div id="page2" class="main-container page-content hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 左侧面板：模型选择和参数输入 -->
+                    <div class="panel">
+                        <h2 class="panel-title">溃坝过程预测</h2>
+                        
+                        <!-- 模型选择 -->
+                        <div class="mb-6">
+                            <h3 class="text-cyan-400 text-lg font-bold mb-3">选择预测模型</h3>
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div class="model-option" onclick="selectModel('peak_flow')">
+                                    <div class="bg-slate-800 p-4 rounded-lg border border-blue-900 hover:border-cyan-500 cursor-pointer transition-all">
+                                        <h4 class="text-white text-center mb-2">峰值流量预测</h4>
+                                        <p class="text-gray-400 text-sm text-center">预测溃坝过程中的最大流量</p>
+                                    </div>
+                                </div>
+                                <div class="model-option" onclick="selectModel('breach_time')">
+                                    <div class="bg-slate-800 p-4 rounded-lg border border-blue-900 hover:border-cyan-500 cursor-pointer transition-all">
+                                        <h4 class="text-white text-center mb-2">溃决历时预测</h4>
+                                        <p class="text-gray-400 text-sm text-center">预测溃坝过程的持续时间</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="model-option" onclick="selectModel('VANRIJN')">
+                                    <div class="bg-slate-800 p-4 rounded-lg border border-blue-900 hover:border-cyan-500 cursor-pointer transition-all">
+                                        <h4 class="text-white text-center mb-2">Van Rijn模型</h4>
+                                        <p class="text-gray-400 text-sm text-center">详细的溃坝过程模拟</p>
+                                    </div>
+                                </div>
+                                <div class="model-option" onclick="selectModel('BREACH')">
+                                    <div class="bg-slate-800 p-4 rounded-lg border border-blue-900 hover:border-cyan-500 cursor-pointer transition-all">
+                                        <h4 class="text-white text-center mb-2">BREACH模型</h4>
+                                        <p class="text-gray-400 text-sm text-center">经典的溃坝模拟模型</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 参数输入 -->
+                        <div class="mb-6">
+                            <h3 class="text-cyan-400 text-lg font-bold mb-3">输入参数</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-gray-300 mb-1">坝高 (m)</label>
+                                    <input type="number" id="height" class="w-full bg-slate-800 border border-blue-900 rounded-lg p-2 text-white" placeholder="输入坝高">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-300 mb-1">坝宽 (m)</label>
+                                    <input type="number" id="width" class="w-full bg-slate-800 border border-blue-900 rounded-lg p-2 text-white" placeholder="输入坝宽">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-300 mb-1">库容 (m³)</label>
+                                    <input type="number" id="volume" class="w-full bg-slate-800 border border-blue-900 rounded-lg p-2 text-white" placeholder="输入库容">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-300 mb-1">物质组成</label>
+                                    <select id="material" class="w-full bg-slate-800 border border-blue-900 rounded-lg p-2 text-white">
+                                        <option value="土质为主">土质为主</option>
+                                        <option value="土含块石">土含块石</option>
+                                        <option value="块石夹土">块石夹土</option>
+                                        <option value="块石为主">块石为主</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 计算按钮 -->
+                        <div class="text-center">
+                            <button id="calculate-btn" onclick="calculateModel()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+                                开始计算
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 右侧面板：计算结果 -->
+                    <div class="panel">
+                        <h2 class="panel-title">计算结果</h2>
+                        
+                        <!-- 结果显示 -->
+                        <div id="result-container" class="hidden">
+                            <div class="bg-slate-800 p-6 rounded-lg border border-blue-900 mb-6">
+                                <h3 class="text-cyan-400 text-lg font-bold mb-3">预测结果</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-gray-400">模型类型</p>
+                                        <p id="result-model" class="text-white text-xl font-bold">-</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-400">预测值</p>
+                                        <p id="result-value" class="text-white text-xl font-bold">-</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 结果图表 -->
+                            <div class="chart-container h-[300px]">
+                                <canvas id="resultChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 加载中状态 -->
+                        <div id="loading-container" class="hidden">
+                            <div class="flex flex-col items-center justify-center h-[400px]">
+                                <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mb-4"></div>
+                                <p class="text-cyan-400 text-lg">计算中，请稍候...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 初始状态 -->
+                        <div id="initial-container">
+                            <div class="flex flex-col items-center justify-center h-[400px] text-center">
+                                <span class="material-icons text-6xl text-gray-600 mb-4">model_training</span>
+                                <p class="text-gray-400 text-lg mb-2">请在左侧选择模型并输入参数</p>
+                                <p class="text-gray-600">计算结果将在此处显示</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 底部导航 -->
+        <div class="bottom-nav">
+            <a href="#" onclick="showPage('page1')" class="nav-active">
+                <span class="material-icons text-2xl">dashboard</span>
+                <span class="text-sm">大坝监测</span>
+            </a>
+            <a href="#" onclick="showPage('page2')">
+                <span class="material-icons text-2xl">model_training</span>
+                <span class="text-sm">模型预测</span>
+            </a>
+            <a href="pages/geography.html">
+                <span class="material-icons text-2xl">public</span>
+                <span class="text-sm">地理地址</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 引入JS文件 -->
+    <script src="js/earth.js"></script>
+    <script src="js/index.js"></script>
+    
+    <script>
+        // 全局变量
+        let currentPage = 'page1';
+        let caseData = [];
+        let floodChart = null;
+        let fitChart = null;
+        let resultChart = null;
+        let selectedCaseInfo = null;
+        const API_BASE = 'http://localhost:5080/api';
+        
+        // 模型预测相关变量
+        let selectedModel = null;
+        let modelChart = null;
+        
+        // 页面导航函数
+        function showPage(pageId) {
+            // 隐藏所有页面
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.classList.add('hidden');
+            });
+            
+            // 显示选中页面
+            document.getElementById(pageId).classList.remove('hidden');
+            currentPage = pageId;
+            
+            // 更新底部导航激活状态
+            document.querySelectorAll('.bottom-nav a').forEach(link => {
+                link.classList.remove('nav-active');
+            });
+            
+            // 激活当前页面的导航按钮
+            document.querySelector(`.bottom-nav a[onclick="showPage('${pageId}')"]`).classList.add('nav-active');
+        }
+        
+        // 模型选择函数
+        function selectModel(modelType) {
+            // 更新选中的模型
+            selectedModel = modelType;
+            
+            // 更新UI，高亮显示选中的模型
+            document.querySelectorAll('.model-option > div').forEach(div => {
+                div.classList.remove('border-cyan-500');
+                div.classList.add('border-blue-900');
+            });
+            
+            // 获取当前选中的元素并高亮
+            const selectedElement = document.querySelector(`.model-option[onclick="selectModel('${modelType}')"] > div`);
+            if (selectedElement) {
+                selectedElement.classList.remove('border-blue-900');
+                selectedElement.classList.add('border-cyan-500');
+            }
+            
+            console.log(`已选择模型: ${modelType}`);
+        }
+        
+        // 计算模型函数
+        async function calculateModel() {
+            // 检查是否选择了模型
+            if (!selectedModel) {
+                alert('请先选择一个预测模型');
+                return;
+            }
+            
+            // 获取输入参数
+            const height = document.getElementById('height').value;
+            const width = document.getElementById('width').value;
+            const volume = document.getElementById('volume').value;
+            const material = document.getElementById('material').value;
+            
+            // 验证输入
+            if (!height || !width || !volume) {
+                alert('请输入所有必要参数');
+                return;
+            }
+            
+            // 显示加载状态
+            document.getElementById('initial-container').classList.add('hidden');
+            document.getElementById('result-container').classList.add('hidden');
+            document.getElementById('loading-container').classList.remove('hidden');
+            
+            try {
+                // 调用API
+                const response = await fetch(`${API_BASE}/models/calculate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: selectedModel,
+                        parameters: {
+                            height: parseFloat(height),
+                            width: parseFloat(width),
+                            volume: parseFloat(volume),
+                            material: material
+                        }
+                    })
+                });
+                
+                // 解析响应
+                const data = await response.json();
+                
+                // 检查是否有错误
+                if (data.error) {
+                    alert(`计算错误: ${data.error}`);
+                    document.getElementById('loading-container').classList.add('hidden');
+                    document.getElementById('initial-container').classList.remove('hidden');
+                    return;
+                }
+                
+                // 显示结果
+                document.getElementById('loading-container').classList.add('hidden');
+                document.getElementById('result-container').classList.remove('hidden');
+                
+                // 更新结果文本
+                document.getElementById('result-model').textContent = getModelDisplayName(selectedModel);
+                document.getElementById('result-value').textContent = formatResult(data.result, selectedModel);
+                
+                // 如果有图表数据，更新图表
+                if (data.chart_data || data.fit_data) {
+                    updateResultChart(data);
+                }
+            } catch (error) {
+                console.error('计算错误:', error);
+                alert('计算过程中发生错误，请稍后重试');
+                document.getElementById('loading-container').classList.add('hidden');
+                document.getElementById('initial-container').classList.remove('hidden');
+            }
+        }
+        
+        // 获取模型显示名称
+        function getModelDisplayName(modelType) {
+            const modelNames = {
+                'peak_flow': '峰值流量预测',
+                'breach_time': '溃决历时预测',
+                'VANRIJN': 'Van Rijn模型',
+                'BREACH': 'BREACH模型',
+                'CHEN': 'CHEN模型',
+                'DAMBRK': 'DAMBRK模型',
+                'MPM': 'MPM模型',
+                'SMART': 'SMART模型',
+                'WANG': 'WANG模型',
+                'YANG': 'YANG模型'
+            };
+            
+            return modelNames[modelType] || modelType;
+        }
+        
+        // 格式化结果
+        function formatResult(result, modelType) {
+            if (modelType === 'peak_flow') {
+                return `${result.toFixed(2)} m³/s`;
+            } else if (modelType === 'breach_time') {
+                return `${result.toFixed(2)} 小时`;
+            } else {
+                return result.toFixed(4);
+            }
+        }
+        
+        // 更新结果图表
+        function updateResultChart(data) {
+            const ctx = document.getElementById('resultChart').getContext('2d');
+            
+            // 如果已有图表，销毁它
+            if (modelChart) {
+                modelChart.destroy();
+            }
+            
+            // 准备图表数据
+            let chartData = {
+                labels: [],
+                datasets: [{
+                    label: '预测结果',
+                    data: [],
+                    borderColor: 'rgba(0, 191, 255, 1)',
+                    backgroundColor: 'rgba(0, 191, 255, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            };
+            
+            // 使用API返回的数据
+            if (data.chart_data) {
+                chartData.labels = data.chart_data.x;
+                chartData.datasets[0].data = data.chart_data.y;
+            } else if (data.fit_data) {
+                chartData.labels = data.fit_data.x;
+                chartData.datasets[0].data = data.fit_data.y;
+            }
+            
+            // 创建图表
+            modelChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 页面加载完成后初始化应用
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('DOM Content Loaded');
+            
+            // 显示页面1
+            showPage('page1');
+            
+            // 等待一小段时间确保容器完全渲染
+            setTimeout(async () => {
+                console.log('Initializing Earth...');
+                const globeContainer = document.getElementById('globe-container');
+                const earthCanvas = document.getElementById('earth-canvas');
+                
+                if (globeContainer && earthCanvas) {
+                    console.log('Container and canvas found, dimensions:', {
+                        container: {
+                            width: globeContainer.clientWidth,
+                            height: globeContainer.clientHeight
+                        },
+                        canvas: {
+                            width: earthCanvas.clientWidth,
+                            height: earthCanvas.clientHeight
+                        }
+                    });
+                    
+                    try {
+                        // 初始化3D地球
+                        await initEarth();
+                        console.log('Earth initialized successfully');
+                        
+                        // 添加标记点
+                        await showAllCaseMarkers();
+                        console.log('Markers added successfully');
+                    } catch (error) {
+                        console.error('Error initializing Earth:', error);
+                    }
+                } else {
+                    console.error('Globe container or canvas not found');
+                }
+                
+                // 初始化其他组件
+                await loadCaseData();
+                initializeCharts();
+            }, 500);
+        });
+        
+        // 初始化图表
+        function initializeCharts() {
+            // 初始化大坝监测图表
+            const damChartCtx = document.getElementById('damChart').getContext('2d');
+            floodChart = new Chart(damChartCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                    datasets: [{
+                        label: '水位 (m)',
+                        data: [65, 68, 70, 72, 74, 71],
+                        borderColor: 'rgba(0, 191, 255, 1)',
+                        backgroundColor: 'rgba(0, 191, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 加载案例数据
+        async function loadCaseData() {
+            try {
+                const response = await fetch(`${API_BASE}/cases`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch case data');
+                }
+                
+                const data = await response.json();
+                caseData = data.cases || [];
+                console.log('Case data loaded:', caseData);
+                
+                // 更新UI
+                updateCaseUI();
+            } catch (error) {
+                console.error('Error loading case data:', error);
+            }
+        }
+        
+        // 更新案例UI
+        function updateCaseUI() {
+            // 这里可以添加更新UI的代码
+        }
+        
+        // 显示所有案例标记
+        async function showAllCaseMarkers() {
+            try {
+                const response = await fetch(`${API_BASE}/locations`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch locations');
+                }
+                
+                const data = await response.json();
+                allLocations = data.locations || [];
+                
+                // 添加标记点
+                allLocations.forEach(location => {
+                    addMarker(location.Lat, location.Lon, 0xff0000, location.Name);
+                });
+                
+                console.log('All markers added:', allLocations.length);
+            } catch (error) {
+                console.error('Error showing case markers:', error);
+                
+                // 添加一些默认标记点
+                addMarker(30.9810, 102.0250, 0xff0000, '丹巴梅龙沟');
+                addMarker(29.5909, 102.1797, 0x00ff00, '泸定县烂田湾');
+                addMarker(31.8467, 104.4272, 0xffff00, '唐家山堰塞坝');
+            }
+        }
+        
+        // 搜索地点
+        function searchLocation() {
+            const searchTerm = document.getElementById('location-search').value.trim();
+            if (!searchTerm) return;
+            
+            const foundLocation = searchAndZoomToLocation(searchTerm);
+            if (!foundLocation) {
+                alert(`未找到包含 "${searchTerm}" 的地点`);
+            }
+        }
+        
+        // 全屏切换
+        document.getElementById('fullscreen-btn').addEventListener('click', function() {
+            toggleFullScreen();
+        });
+        
+        // 全屏切换函数
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+        
+        // 刷新数据
+        function refreshData() {
+            loadCaseData();
+        }
+        
+        // 显示帮助信息
+        function showHelp() {
+            alert('溃坝过程预测系统使用帮助：\n\n1. 大坝监测页面：查看大坝地理位置和监测数据\n2. 模型预测页面：选择模型并输入参数进行预测\n\n如需更多帮助，请参阅系统文档。');
+        }
+        
+        // 切换设置
+        function toggleSettings() {
+            alert('系统设置功能正在开发中，敬请期待！');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>结果分析 - 溃坝预测AI智能分析系统</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&amp;display=swap" rel="stylesheet"/>
+    <!-- 3D Earth dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            color: #ffffff;
+            font-family: 'Noto Sans SC', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 50%, rgba(51, 65, 85, 0.85) 100%);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid rgba(0, 255, 255, 0.3);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 255, 255, 0.2);
+            height: 80px;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(90deg, transparent 95%, rgba(0, 255, 255, 0.5) 95%),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.1) 85%, transparent 85%),
+                linear-gradient(90deg, transparent 75%, rgba(0, 255, 255, 0.2) 75%);
+            background-size: 20px 100%, 30px 100%, 40px 100%;
+            z-index: -1;
+            opacity: 0.3;
+            animation: scanline 3s linear infinite;
+        }
+        
+        @keyframes scanline {
+            0% { background-position: 0 0, 0 0, 0 0; }
+            100% { background-position: 20px 0, 30px 0, 40px 0; }
+        }
+
+        .header-title {
+            color: #ffffff;
+            font-size: 2.0rem;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.8), 0 0 30px rgba(0, 255, 255, 0.4);
+            letter-spacing: 2px;
+            position: relative;
+            z-index: 2;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        
+        .nav-section {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .nav-group {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 255, 255, 0.08);
+            border: 1px solid #00ffff;
+            position: relative;
+            padding: 8px 20px;
+            margin: 0 2px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6), 
+                        inset 0 0 15px rgba(0, 255, 255, 0.2);
+            animation: pulse 2s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 20px rgba(0, 255, 255, 0.6), inset 0 0 15px rgba(0, 255, 255, 0.2); }
+            100% { box-shadow: 0 0 30px rgba(0, 255, 255, 0.8), inset 0 0 20px rgba(0, 255, 255, 0.4); }
+        }
+        
+        /* 左侧导航组样式 */
+        .nav-section:first-child .nav-group {
+            clip-path: polygon(0% 0%, calc(100% - 15px) 0%, 100% 100%, 15px 100%);
+            border-right: 2px solid #00ffff;
+        }
+        
+        /* 右侧导航组样式 */
+        .nav-section:last-child .nav-group {
+            clip-path: polygon(15px 0%, 100% 0%, 100% 100%, 0% 100%);
+            border-left: 2px solid #00ffff;
+        }
+        
+        .nav-group::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.1), rgba(0, 255, 255, 0.3));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        /* 左侧导航组伪元素样式 */
+        .nav-section:first-child .nav-group::before {
+            clip-path: polygon(0% 0%, calc(100% - 12px) 0%, 100% 100%, 12px 100%);
+        }
+        
+        /* 右侧导航组伪元素样式 */
+        .nav-section:last-child .nav-group::before {
+            clip-path: polygon(12px 0%, 100% 0%, 100% 100%, 0% 100%);
+        }
+        
+        .nav-group:hover {
+            background: rgba(0, 255, 255, 0.15);
+            border-color: #00ffff;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.6), 
+                        0 0 50px rgba(0, 255, 255, 0.3),
+                        inset 0 0 15px rgba(0, 255, 255, 0.2);
+            transform: translateY(-2px);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .nav-group:active {
+            transform: translateY(1px);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5), 
+                        inset 0 0 10px rgba(0, 255, 255, 0.3);
+            transition: all 0.1s ease;
+        }
+        
+        .nav-group:hover::before {
+            opacity: 1;
+        }
+        
+        .nav-group a {
+            color: #00ffff;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin: 0 6px;
+            padding: 4px 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            text-shadow: 0 0 4px rgba(0, 255, 255, 0.4);
+            font-family: 'Microsoft YaHei', sans-serif;
+            border-bottom: 1px solid transparent;
+        }
+        
+        .nav-group a:hover {
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4);
+            transform: scale(1.05);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.6);
+            animation: glitch 0.3s ease;
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        
+        .nav-group a.active {
+            color: #ffffff;
+            text-shadow: 0 0 12px rgba(0, 255, 255, 0.9), 0 0 24px rgba(0, 255, 255, 0.5);
+            background: rgba(0, 255, 255, 0.15);
+            border-radius: 2px;
+        }
+        
+        .nav-group a::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+        
+        .nav-group a:hover::before {
+            transform: translateX(100%);
+        }
+        
+        .nav-divider {
+            width: 1px;
+            height: 18px;
+            background: linear-gradient(to bottom, transparent, #00ffff, transparent);
+            margin: 0 8px;
+            box-shadow: 0 0 6px rgba(0, 255, 255, 0.4);
+        }
+        
+        /* 图标工具栏样式 */
+        .icon-toolbar {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0, 20, 40, 0.9);
+            border: 1px solid rgba(0, 191, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease-in-out;
+            pointer-events: none;
+        }
+
+        .icon-toolbar:hover,
+        .icon-toolbar.show {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+
+        .icon-toolbar::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            right: -20px;
+            width: 40px;
+            height: 60px;
+            pointer-events: auto;
+        }
+
+        .icon-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .icon-group .material-icons {
+            color: rgba(0, 191, 255, 0.8);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 20px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .icon-group .material-icons:hover {
+            color: #00bfff;
+            background: rgba(0, 191, 255, 0.1);
+            transform: scale(1.1);
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 1rem;
+            padding: 1rem;
+            height: calc(100vh - 100px);
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        .panel {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 1rem rgba(0, 255, 255, 0.3);
+            min-height: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            box-sizing: border-box;
+            position: relative;
+        }
+        
+        .panel-title {
+            color: #87ceeb;
+            font-size: 1.25rem;
+            font-weight: 500;
+            border-bottom: 1px solid #1a3a6e;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            letter-spacing: 0.5px;
+        }
+        
+        .panel-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            background-color: #87ceeb;
+            margin-right: 8px;
+        }
+        
+        .tab-btn {
+            background-color: rgba(30, 64, 175, 0.5);
+            color: #93c5fd;
+            border: 1px solid #1e40af;
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border-radius: 6px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .tab-btn:hover {
+            background-color: rgba(0, 255, 255, 0.2);
+            color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        .tab-btn.active {
+            background-color: #1e40af;
+            color: #ffffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+        
+        .stat-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            position: relative;
+        }
+        
+        .stat-circle::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .stat-circle-green {
+            border: 4px solid #4ade80;
+            color: #4ade80;
+            box-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
+            background: linear-gradient(145deg, rgba(0, 128, 0, 0.2), rgba(0, 128, 0, 0.4));
+        }
+        
+        .stat-circle-green::before {
+            border-top-color: #4ade80;
+            border-right-color: #4ade80;
+        }
+        
+        .stat-circle-blue {
+            border: 4px solid #60a5fa;
+            color: #60a5fa;
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.5);
+            background: linear-gradient(145deg, rgba(0, 0, 255, 0.2), rgba(0, 0, 255, 0.4));
+        }
+        
+        .stat-circle-blue::before {
+            border-top-color: #60a5fa;
+            border-right-color: #60a5fa;
+        }
+        
+        .stat-circle-yellow {
+            border: 4px solid #facc15;
+            color: #facc15;
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.5);
+            background: linear-gradient(145deg, rgba(255, 255, 0, 0.2), rgba(255, 255, 0, 0.4));
+        }
+        
+        .stat-circle-yellow::before {
+            border-top-color: #facc15;
+            border-right-color: #facc15;
+        }
+        
+        .stat-circle .value {
+            font-size: 1.5rem;
+        }
+        
+        .stat-circle .unit {
+            font-size: 0.75rem;
+        }
+        
+        .stat-label {
+            background-color: rgba(0, 191, 255, 0.2);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.875rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 0.4; }
+            100% { opacity: 0.8; }
+        }
+        
+        /* 响应式布局 */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+        }
+        
+        /* 底部导航样式 */
+        body {
+            padding-bottom: 80px;
+        }
+        
+        .main-container {
+            margin-bottom: 80px;
+        }
+        
+        /* 底部导航按钮激活状态 */
+        .nav-active {
+            color: #00bfff !important;
+            background-color: rgba(0, 191, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <!-- Header -->
+        <header class="header">
+            <!-- 左侧导航组 -->
+            <div class="nav-section">
+                <div class="nav-group">
+                    <a href="../web_ui.html">系统首页</a>
+                    <div class="nav-divider"></div>
+                    <a href="geography.html">大坝信息</a>
+                    <div class="nav-divider"></div>
+                    <a href="#">溃坝风险</a>
+                    <div class="nav-divider"></div>
+                    <a href="#">监测预警</a>
+                </div>
+            </div>
+            
+            <!-- 中央标题 -->
+            <h1 class="header-title">溃坝预测AI智能分析系统</h1>
+            
+            <!-- 右侧功能组 -->
+            <div class="nav-section">
+                <div class="nav-group">
+                    <a href="data_preprocessing.html">数据预处理</a>
+                    <div class="nav-divider"></div>
+                    <a href="model_training.html">模型训练</a>
+                    <div class="nav-divider"></div>
+                    <a class="active" href="result_analysis.html">结果分析</a>
+                    <div class="nav-divider"></div>
+                    <a href="computing_power.html">算力说明</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- 图标工具栏 -->
+        <div class="icon-toolbar">
+            <div class="icon-group">
+                <div class="icon-btn" id="fullscreen-btn" title="全屏">⛶</div>
+                <div class="icon-btn" onclick="openSettings()" title="设置">⚙</div>
+                <div class="icon-btn" onclick="showHelp()" title="帮助">?</div>
+                <div class="icon-btn" onclick="showNotifications()" title="通知">🔔</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main>
+        <div class="main-container">
+            <!-- 左侧面板 -->
+            <div class="panel">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="panel-title" style="border-bottom: none; margin-bottom: 0;">溃坝预测分析指标</h2>
+                </div>
+                <div class="flex justify-around items-center mb-6">
+                    <div class="text-center space-y-2">
+                        <div class="stat-circle stat-circle-green">
+                            <span class="value">95</span>
+                            <span class="unit">%</span>
+                        </div>
+                        <p class="text-xs text-gray-300">预测准确率</p>
+                    </div>
+                    <div class="text-center space-y-2">
+                        <div class="stat-circle stat-circle-blue">
+                            <span class="value">87</span>
+                            <span class="unit">%</span>
+                        </div>
+                        <p class="text-xs text-gray-300">风险识别率</p>
+                    </div>
+                    <div class="text-center space-y-2">
+                        <div class="stat-circle stat-circle-yellow">
+                            <span class="value">92</span>
+                            <span class="unit">%</span>
+                        </div>
+                        <p class="text-xs text-gray-300">预警覆盖率</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4 mt-4">
+                    <div class="stat-label text-green-400">
+                        <p class="text-lg font-bold">F1</p>
+                        <p class="text-xs">89.3%</p>
+                    </div>
+                    <div class="stat-label text-blue-400">
+                        <p class="text-lg font-bold">AUC</p>
+                        <p class="text-xs">0.94</p>
+                    </div>
+                    <div class="stat-label text-yellow-400">
+                        <p class="text-lg font-bold">Loss</p>
+                        <p class="text-xs">0.234</p>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h3 class="panel-title">溃坝预测混淆矩阵</h3>
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                            <div></div>
+                            <div class="text-cyan-400 font-bold">预测正例</div>
+                            <div class="text-cyan-400 font-bold">预测负例</div>
+                            <div class="text-cyan-400 font-bold">实际正例</div>
+                            <div class="bg-green-900 p-2 rounded text-green-400 font-bold">2156</div>
+                            <div class="bg-red-900 p-2 rounded text-red-400">234</div>
+                            <div class="text-cyan-400 font-bold">实际负例</div>
+                            <div class="bg-red-900 p-2 rounded text-red-400">187</div>
+                            <div class="bg-green-900 p-2 rounded text-green-400 font-bold">3421</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h3 class="panel-title">溃坝风险分类报告</h3>
+                    <div class="space-y-3">
+                        <div class="bg-slate-800 p-3 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-cyan-400 font-bold">高风险溃坝</span>
+                                <div class="text-right">
+                                    <div class="text-green-400 text-sm">精确率: 94.2%</div>
+                                    <div class="text-blue-400 text-sm">召回率: 91.8%</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800 p-3 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-cyan-400 font-bold">中风险溃坝</span>
+                                <div class="text-right">
+                                    <div class="text-green-400 text-sm">精确率: 89.7%</div>
+                                    <div class="text-blue-400 text-sm">召回率: 87.3%</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800 p-3 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-cyan-400 font-bold">低风险溃坝</span>
+                                <div class="text-right">
+                                    <div class="text-green-400 text-sm">精确率: 92.1%</div>
+                                    <div class="text-blue-400 text-sm">召回率: 88.9%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 中间面板 -->
+            <div class="panel">
+                <div class="mt-6">
+                    <h3 class="panel-title">溃坝预测结果可视化</h3>
+                    <div class="relative w-full h-[600px] bg-black rounded-lg overflow-hidden p-4">
+                        <!-- 分析图表 -->
+                        <div class="grid grid-cols-2 gap-4 h-full">
+                            <div class="bg-slate-900 rounded-lg p-4">
+                                <h4 class="text-cyan-400 text-sm font-bold mb-3">ROC曲线</h4>
+                                <div class="relative h-48">
+                                    <canvas id="rocChart" class="w-full h-full"></canvas>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-400">
+                                    <span class="text-green-400">AUC: 0.94</span> | 
+                                    <span class="text-blue-400">最佳阈值: 0.52</span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-slate-900 rounded-lg p-4">
+                                <h4 class="text-cyan-400 text-sm font-bold mb-3">溃坝风险因子重要性</h4>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-xs">
+                                        <span>大坝结构强度</span>
+                                        <span>0.23</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" style="width: 92%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span>水位变化率</span>
+                                        <span>0.19</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" style="width: 76%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span>地基稳定性</span>
+                                        <span>0.16</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" style="width: 64%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span>渗流压力</span>
+                                        <span>0.14</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" style="width: 56%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs">
+                                        <span>海拔高度</span>
+                                        <span>0.12</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" style="width: 48%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-slate-900 rounded-lg p-4">
+                                <h4 class="text-cyan-400 text-sm font-bold mb-3">预测分布</h4>
+                                <div class="relative h-48">
+                                    <canvas id="distributionChart" class="w-full h-full"></canvas>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-400">
+                                    <span class="text-red-400">高风险: 15.2%</span> | 
+                                    <span class="text-yellow-400">中风险: 28.7%</span> | 
+                                    <span class="text-green-400">低风险: 56.1%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-slate-900 rounded-lg p-4">
+                                <h4 class="text-cyan-400 text-sm font-bold mb-3">时间序列分析</h4>
+                                <div class="relative h-48">
+                                    <canvas id="timeSeriesChart" class="w-full h-full"></canvas>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-400">
+                                    <span class="text-purple-400">趋势: 上升</span> | 
+                                    <span class="text-cyan-400">季节性: 明显</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧面板 -->
+            <div class="panel">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="panel-title" style="border-bottom: none; margin-bottom: 0;">分析工具</h3>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 text-sm font-bold mb-3">报告生成</h4>
+                        <div class="space-y-2">
+                            <button class="tab-btn active w-full flex items-center justify-center space-x-2">
+                                <span class="material-symbols-outlined text-base">description</span>
+                                <span>生成分析报告</span>
+                            </button>
+                            <button class="tab-btn w-full flex items-center justify-center space-x-2">
+                                <span class="material-symbols-outlined text-base">download</span>
+                                <span>导出结果</span>
+                            </button>
+                            <button class="tab-btn w-full flex items-center justify-center space-x-2">
+                                <span class="material-symbols-outlined text-base">share</span>
+                                <span>分享结果</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 text-sm font-bold mb-3">可视化选项</h4>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2">
+                                <span class="text-sm">显示置信区间</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2">
+                                <span class="text-sm">显示特征重要性</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" class="mr-2">
+                                <span class="text-sm">显示错误分析</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <h4 class="text-cyan-400 text-sm font-bold mb-3">阈值调整</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm text-gray-300 mb-1">分类阈值</label>
+                                <input type="range" min="0" max="1" step="0.01" value="0.5" 
+                                       class="w-full">
+                                <div class="text-xs text-gray-400 mt-1">当前值: 0.50</div>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-300 mb-1">置信度阈值</label>
+                                <input type="range" min="0" max="1" step="0.01" value="0.8" 
+                                       class="w-full">
+                                <div class="text-xs text-gray-400 mt-1">当前值: 0.80</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h3 class="panel-title">预测结果</h3>
+                    <div class="bg-black rounded-lg p-3 h-48 overflow-y-auto text-xs">
+                        <div class="space-y-2">
+                            <div class="flex justify-between p-2 bg-slate-800 rounded">
+                                <span>样本 #001</span>
+                                <span class="text-red-400">高风险 (0.89)</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-slate-800 rounded">
+                                <span>样本 #002</span>
+                                <span class="text-green-400">低风险 (0.12)</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-slate-800 rounded">
+                                <span>样本 #003</span>
+                                <span class="text-yellow-400">中风险 (0.67)</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-slate-800 rounded">
+                                <span>样本 #004</span>
+                                <span class="text-green-400">低风险 (0.23)</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-slate-800 rounded">
+                                <span>样本 #005</span>
+                                <span class="text-red-400">高风险 (0.91)</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-slate-800 rounded">
+                                <span>样本 #006</span>
+                                <span class="text-yellow-400">中风险 (0.54)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h3 class="panel-title">模型对比</h3>
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-sm">ResNet-50</span>
+                                <span class="text-green-400">95.2%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm">VGG-16</span>
+                                <span class="text-blue-400">92.8%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm">Transformer</span>
+                                <span class="text-yellow-400">89.5%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm">CNN</span>
+                                <span class="text-purple-400">87.3%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </main>
+
+    <script>
+        // 图标工具栏显示逻辑
+        const iconToolbar = document.querySelector('.icon-toolbar');
+        let showTimeout;
+        let hideTimeout;
+
+        // 鼠标进入右上角区域时显示工具栏
+        document.addEventListener('mousemove', (e) => {
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // 检查鼠标是否在右上角区域
+            if (e.clientX > windowWidth - 100 && e.clientY < 100) {
+                clearTimeout(hideTimeout);
+                showTimeout = setTimeout(() => {
+                    iconToolbar.classList.add('show');
+                }, 300);
+            } else {
+                clearTimeout(showTimeout);
+                hideTimeout = setTimeout(() => {
+                    iconToolbar.classList.remove('show');
+                }, 500);
+            }
+        });
+
+        // 全屏功能
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // 模拟图表绘制
+        function drawChart(canvasId, type, data, colors) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width = canvas.offsetWidth;
+            const height = canvas.height = canvas.offsetHeight;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            if (type === 'roc') {
+                // 绘制ROC曲线
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let i = 0; i <= 100; i++) {
+                    const x = (i / 100) * width;
+                    const y = height - (Math.pow(i / 100, 0.5) * height);
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+                
+                // 绘制对角线
+                ctx.strokeStyle = '#6b7280';
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, height);
+                ctx.lineTo(width, 0);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else if (type === 'distribution') {
+                // 绘制分布图
+                const bars = [0.561, 0.287, 0.152];
+                const barColors = ['#22c55e', '#facc15', '#ef4444'];
+                const barWidth = width / bars.length;
+                
+                bars.forEach((value, index) => {
+                    ctx.fillStyle = barColors[index];
+                    const barHeight = value * height;
+                    ctx.fillRect(index * barWidth, height - barHeight, barWidth - 2, barHeight);
+                });
+            } else if (type === 'timeSeries') {
+                // 绘制时间序列
+                ctx.strokeStyle = '#8b5cf6';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let i = 0; i <= 50; i++) {
+                    const x = (i / 50) * width;
+                    const y = height - ((0.5 + 0.3 * Math.sin(i * 0.2) + 0.1 * Math.random()) * height);
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            }
+        }
+
+        // 绘制图表
+        setTimeout(() => {
+            drawChart('rocChart', 'roc');
+            drawChart('distributionChart', 'distribution');
+            drawChart('timeSeriesChart', 'timeSeries');
+        }, 100);
+
+        // 阈值调整事件
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', function() {
+                const valueDisplay = this.parentNode.querySelector('.text-xs');
+                valueDisplay.textContent = `当前值: ${this.value}`;
+            });
+        });
+
+        // 分析工具按钮事件
+        function generateReport() {
+            console.log('生成分析报告');
+        }
+
+        function exportResults() {
+            console.log('导出结果');
+        }
+
+        function shareResults() {
+            console.log('分享结果');
+        }
+    </script>
+</body>
+</html>
